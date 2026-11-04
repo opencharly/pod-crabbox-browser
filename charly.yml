@@ -1,0 +1,43 @@
+# pod-crabbox-browser — the browser lease image for the Crabbox containerd
+# provider.
+#
+# One repo per image (W5.2). The image imports the base lease image at a PINNED
+# tag, so the image tag and the git tag name the same build:
+# ghcr.io/opencharly/pod-crabbox-browser:<tag> is the tree tagged <tag>.
+repo: github.com/opencharly/pod-crabbox-browser
+defaults:
+    platform:
+        - linux/amd64
+    tag: auto
+    registry: ghcr.io/opencharly
+    build:
+        - pac
+import: []
+discover:
+    - path: candy
+      recursive: true
+
+pod-crabbox-browser:
+    candy:
+        description: |
+            The browser lease image for a Crabbox `containerd` lease: the base
+            `pod-crabbox` contract with Chromium and Firefox installed and a
+            `/usr/local/bin/crabbox-browser` wrapper that launches Chromium with its
+            sandbox ENABLED. On crun/runc the host runs the lease with the narrow
+            `/etc/containerd/seccomp/crabbox-userns.json` profile (which restores
+            `unshare`/`clone` while leaving `keyctl`/`mount` enforced), and under krun
+            the guest kernel is the boundary; this image never passes `--no-sandbox`
+            and never asks for `seccomp=unconfined`.
+        base: ghcr.io/opencharly/pod-crabbox:2026.307.1828
+        # An OCI base does not inherit the parent's distro/build values, so the
+        # CachyOS chain is declared here; the base image is itself CachyOS.
+        distro:
+            - cachyos
+            - arch
+        # PID 1 is the base image's `sshd -D`, which must run as root; the LOGIN
+        # user stays `crabbox` (uid 1000), created by the inherited candy.
+        user: root
+        uid: 0
+        gid: 0
+        candy:
+            - crabbox-browser

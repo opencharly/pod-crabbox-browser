@@ -1,0 +1,14 @@
+#!/bin/bash
+# /usr/local/bin/crabbox-browser — the Crabbox browser launcher.
+#
+# The sandbox is ON. On crun/runc the lease must be started with the narrow
+# /etc/containerd/seccomp/crabbox-userns.json profile (which restores
+# unshare/clone while keeping keyctl/mount enforced); under krun the guest
+# kernel is the boundary. This wrapper never passes --no-sandbox and never
+# asks for seccomp=unconfined.
+set -euo pipefail
+exec chromium \
+    --no-first-run \
+    --no-default-browser-check \
+    --user-data-dir="${HOME}/.config/crabbox-chromium" \
+    "$@"
