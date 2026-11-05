@@ -1,0 +1,66 @@
+# crabbox-browser — the sandboxed browser the lease consumer launches over SSH.
+crabbox-browser:
+    candy:
+        description: |
+            Chromium (Arch's `chromium`, repo package) and Firefox, plus the
+            `/usr/local/bin/crabbox-browser` wrapper. The wrapper launches Chromium
+            with its sandbox ENABLED and its own profile directory; it deliberately
+            contains no `--no-sandbox` and no `--disable-setuid-sandbox`. The build
+            check asserts both browsers report their versions and that the wrapper
+            carries no sandbox-disabling flag.
+        distro:
+            arch:
+                package:
+                    - chromium
+                    - firefox
+        # The lease SSH port is the base image's own contract. An OCI base does not
+        # carry its candy chain's ports across the boundary, so the published number
+        # is restated here (one number, taken from the base image's label).
+        port:
+            - 2222
+
+        plan:
+            - run: install the sandboxed-browser wrapper
+              copy: crabbox-browser
+              to: /usr/local/bin/crabbox-browser
+              mode: "0755"
+              run_as: root
+            - check: chromium is installed and reports its version
+              id: crabbox-browser-chromium
+              exit_status: 0
+              stdout:
+                  - contains: "Chromium"
+              command: >-
+                  chromium --version
+            - check: firefox is installed
+              id: crabbox-browser-firefox
+              exit_status: 0
+              command: >-
+                  test -x /usr/bin/firefox
+            - check: the wrapper is executable and keeps the Chromium sandbox enabled
+              id: crabbox-browser-wrapper
+              exit_status: 0
+              command: >-
+                  test -x /usr/local/bin/crabbox-browser &&
+                  ! grep -v '^[[:space:]]*#' /usr/local/bin/crabbox-browser | grep -q -- '--no-sandbox' &&
+                  ! grep -v '^[[:space:]]*#' /usr/local/bin/crabbox-browser | grep -q -- '--disable-setuid-sandbox'
+            # The base is a published OCI artifact, so its contract is probed here at
+            # THIS image's boundary — not re-implemented, and not assumed from the tag.
+            - check: the inherited lease SSH contract is present (sshd, bootstrap, readiness hook)
+              id: crabbox-browser-lease-binaries
+              exit_status: 0
+              command: >-
+                  test -x /usr/sbin/sshd &&
+                  test -x /usr/local/libexec/crabbox/bootstrap.sh &&
+                  test -x /usr/local/libexec/crabbox/ready
+            - check: the inherited lease login user is crabbox at uid 1000
+              id: crabbox-browser-lease-user
+              exit_status: 0
+              command: >-
+                  test "$(getent passwd 1000 | cut -d: -f1)" = crabbox
+            - check: the inherited SSH drop-in names port 2222 and sshd parses it
+              id: crabbox-browser-lease-sshd
+              exit_status: 0
+              command: >-
+                  grep -qx 'Port 2222' /etc/ssh/sshd_config.d/99-crabbox.conf &&
+                  /usr/sbin/sshd -t
